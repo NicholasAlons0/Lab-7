@@ -1,0 +1,1084 @@
+load("~/Downloads/Household_Pulse_data.RData")
+
+# Firstly we create the variable for those that got vaccinate, we will not be adding NA's.
+Household_Pulse_data$vaxx <- (Household_Pulse_data$RECVDVACC == "yes got vaxx")
+summary(Household_Pulse_data$vaxx)
+table1 <- table(Household_Pulse_data$vaxx)
+table1
+prop.table(table1)
+# Then we created a table to demonstrate the proportion of those that are and are not vaccinated, 
+# where we find that about 12.7 percent are not vaccinated and 87.3 percent are vaccinated.
+# Then we create a subset for people from 25 to 65 years old.
+use_varb <- (Household_Pulse_data$TBIRTH_YEAR >= 1956) & (Household_Pulse_data$TBIRTH_YEAR <= 1996)
+dat_use1 <- subset(Household_Pulse_data,use_varb) 
+summary(dat_use1)
+d_educ <- data.frame(model.matrix(~ dat_use1$EEDUC))
+summary(d_educ)
+levels(dat_use1$EEDUC)
+d_marstat <- data.frame(model.matrix(~ dat_use1$MS))
+d_race <- data.frame(model.matrix(~ dat_use1$RRACE))
+summary(d_race)
+d_hispanic <- data.frame(model.matrix(~ dat_use1$RHISPANIC))
+d_gender <- data.frame(model.matrix(~ dat_use1$GENID_DESCRIBE))
+d_region <- data.frame(model.matrix(~ dat_use1$REGION))
+d_vaxx <- data.frame(model.matrix(~ dat_use1$vaxx))
+summary(d_vaxx)
+dat_for_analysis_sub <- data.frame(
+  d_vaxx[,2],
+  dat_use1$TBIRTH_YEAR[!is.na(dat_use1$vaxx)],
+  d_educ[!is.na(dat_use1$vaxx),2:7],
+  d_marstat[!is.na(dat_use1$vaxx),2:6],
+  d_race[!is.na(dat_use1$vaxx),2:4],
+  d_hispanic[!is.na(dat_use1$vaxx),2],
+  d_gender[!is.na(dat_use1$vaxx),2:5],
+  d_region[!is.na(dat_use1$vaxx),2:4]) 
+names(dat_for_analysis_sub) <- sub("dat_use1.","",names(dat_for_analysis_sub))
+names(dat_for_analysis_sub)[1] <- "vaxx"
+names(dat_for_analysis_sub)[2] <- "TBIRTH_YEAR"
+names(dat_for_analysis_sub)[17] <- "Hispanic"
+summary(dat_for_analysis_sub)
+
+require("standardize")
+set.seed(1)
+NN <- length(dat_for_analysis_sub$vaxx)
+restrict_1 <- (runif(NN) < 0.5) 
+summary(restrict_1)
+dat_train <- subset(dat_for_analysis_sub, restrict_1)
+dat_test <- subset(dat_for_analysis_sub, !restrict_1)
+sobj <- standardize(vaxx ~ TBIRTH_YEAR + EEDUCsome.hs + EEDUCHS.diploma + EEDUCsome.coll + EEDUCassoc.deg + EEDUCbach.deg + EEDUCadv.deg + 
+                      MSmarried + MSwidowed + MSdivorced + MSseparated + MSnever + RRACEBlack + RRACEAsian + RRACEOther +
+                      Hispanic + GENID_DESCRIBEmale + GENID_DESCRIBEfemale + GENID_DESCRIBEtransgender + GENID_DESCRIBEother +
+                      REGIONSouth + REGIONMidwest + REGIONWest
+                    , dat_train, family = binomial)
+s_dat_test <- predict(sobj, dat_test)
+#Linear
+model_lpm1 <- lm(sobj$formula, data = sobj$data)
+summary(model_lpm1)
+pred_vals_lpm <- predict(model_lpm1, s_dat_test)
+pred_model_lpm1 <- (pred_vals_lpm > mean(pred_vals_lpm))
+table(pred = pred_model_lpm1, true = dat_test$vaxx)
+# logit 
+model_logit1 <- glm(sobj$formula, family = binomial, data = sobj$data)
+summary(model_logit1)
+pred_vals <- predict(model_logit1, s_dat_test, type = "response")
+pred_model_logit1 <- (pred_vals > 0.5)
+table(pred = pred_model_logit1, true = dat_test$vaxx)
+
+#Our model
+Household_Pulse_data$vaxx <- (Household_Pulse_data$RECVDVACC == "yes got vaxx")
+use_varb <- (Household_Pulse_data$TBIRTH_YEAR >= 1956) & (Household_Pulse_data$TBIRTH_YEAR <= 1996)
+dat_use1 <- subset(Household_Pulse_data,use_varb) 
+summary(dat_use1)
+
+d_tbirth_year <- data.frame(model.matrix(~ dat_use1$TBIRTH_YEAR))
+d_educ <- data.frame(model.matrix(~ dat_use1$EEDUC))
+d_marstat <- data.frame(model.matrix(~ dat_use1$MS))
+d_race <- data.frame(model.matrix(~ dat_use1$RRACE))
+d_hispanic <- data.frame(model.matrix(~ dat_use1$RHISPANIC))
+d_gender <- data.frame(model.matrix(~ dat_use1$GENID_DESCRIBE))
+d_region <- data.frame(model.matrix(~ dat_use1$REGION))
+d_vaxx <- data.frame(model.matrix(~ dat_use1$vaxx)) 
+d_onsite <- data.frame(model.matrix(~ dat_use1$Works_onsite)) 
+d_anxious <- data.frame(model.matrix(~ dat_use1$ANXIOUS))
+summary(d_tbirth_year)
+summary(d_educ)
+summary(d_marstat)
+summary(d_race)
+summary(d_hispanic)
+summary(d_gender)
+summary(d_region)
+summary(d_vaxx)
+summary(dat_use1$vaxx)
+summary(d_onsite)
+summary(d_anxious)
+# We add the variable works on site to add more variety to the regression.
+# We can see that in the new data frames by looking into the summary that their levels
+# are still intact
+# Not only does the data frame change them from from factor to numeric, but we can also
+# create our own data frame to look at a handful of meaningful variables.
+dat_for_analysis_sub <- data.frame(d_vaxx[,2],
+  dat_use1$TBIRTH_YEAR[!is.na(dat_use1$vaxx)],
+  d_educ[!is.na(dat_use1$vaxx),2:7],
+  d_marstat[!is.na(dat_use1$vaxx),2:6],
+  d_race[!is.na(dat_use1$vaxx),2:4],
+  d_hispanic[!is.na(dat_use1$vaxx),2],
+  d_gender[!is.na(dat_use1$vaxx),2:5],
+  d_region[!is.na(dat_use1$vaxx),2:4],
+  d_onsite[!is.na(dat_use1$vaxx),2:3],
+  d_anxious[!is.na(dat_use1$vaxx),2:4])
+summary(dat_for_analysis_sub)
+#these omit the first part of the factor, sometimes omits the NA factor, like in
+# marital status, other times it removes the first variables, like in region it removes northeast.
+names(dat_for_analysis_sub) <- sub("dat_use1.","",names(dat_for_analysis_sub))
+summary(dat_for_analysis_sub)
+# We see the difference in names(dat_for_analysis_sub) before and after running this bit, since
+# this removes datuse1 from many of the names, making them easier to type.
+# For this case, we decide not to be anal retentive and leave the rest of the names unchanged.
+# The names code just fixes the name so that it is easier to understand, by removing the dat_use1.
+require("standardize")
+set.seed(1)
+NN <- length(dat_for_analysis_sub$d_vaxx...2.)
+restrict_1 <- (runif(NN) < 0.5) 
+summary(restrict_1)
+dat_train <- subset(dat_for_analysis_sub, restrict_1)
+dat_test <- subset(dat_for_analysis_sub,!restrict_1)
+
+sobj <- standardize(d_vaxx...2. ~ TBIRTH_YEAR..is.na.dat_use1.vaxx.. + EEDUCsome.hs + EEDUCHS.diploma + EEDUCsome.coll 
++ EEDUCassoc.deg + EEDUCbach.deg + EEDUCadv.deg +  MSmarried + MSwidowed + MSdivorced + MSseparated + MSnever + RRACEBlack
++ RRACEAsian + RRACEOther + d_hispanic..is.na.vaxx...2. + GENID_DESCRIBEmale + GENID_DESCRIBEfemale + GENID_DESCRIBEtransgender 
++ GENID_DESCRIBEother + REGIONSouth + REGIONMidwest + REGIONWest + Works_onsiteworked.onsite + Works_onsiteno 
++ ANXIOUSno.anxiety.over.past.2.wks + ANXIOUSseveral.days.anxiety.over.past.2.wks 
++ ANXIOUSmore.than.half.the.days.anxiety.over.past.2.wks
+                    , data = dat_train, family = binomial)
+summary(sobj$data)
+s_dat_test <- predict(sobj, dat_test)
+summary(s_dat_test)
+model_lpm1 <- lm(sobj$formula, data = sobj$data)
+summary(model_lpm1)
+pred_vals_lpm <- predict(model_lpm1, s_dat_test)
+pred_model_lpm1 <- (pred_vals_lpm > mean(pred_vals_lpm))
+pred_lm <- table(pred = pred_model_lpm1, true = dat_test$d_vaxx...2.)
+pred_lm
+(pred_lm[1,1]+pred_lm[2,2])/sum(pred_lm)
+# We have confirmed that the sobj data in our model is operating. The summary of sobj tells us the real 0 and 1 values of the
+# dummy variables in the standardized regression of from the train data, where standardize squeezes down continuous 
+# variables like TBIRTH_YEAR (could add other continuous variables and would also squeeze them down).
+# Then, we use the function predict to obtain predicted values from the test data, to later compare them in a confusion matrix. 
+# In the linear model, people who identify as transgender in GENDID_DESCRIBE have a positive and significant relationship
+# with getting vaccinated, while people who are RACE Other have a negative significant relationship with getting vaccinated, 
+# thus transgender people are more likely to be vaccinated than race other. By using the test data predicted values 
+# from the model(which used the train data), and comparing them to the train data we get a confusion matrix. 
+# In the confusion matrix for linear regression, 2783 and 12434 is correct, while 896 and 8388 are incorrect.
+# We can note the confusion matrix of the linear regression incorrectly predicts a greater amount of false/1
+# compared to the predicted true/0. We can get some idea of the predictive accuracy of the model by dividing 
+# the correct amounts by the sum of the total. The accuracy of the model is about 62% correct.
+
+# logit 
+# Because we use sobj$formaula, we just have to change the name, so we wont have to retype
+model_logit1 <- glm(sobj$formula, family = binomial, data = sobj$data)
+summary(model_logit1)
+pred_vals <- predict(model_logit1, s_dat_test)
+pred_model_logit1 <- (pred_vals > 0.5)
+pred_logit <- table(pred = pred_model_logit1, true = dat_test$d_vaxx...2.)
+pred_logit
+(pred_logit[1,1]+pred_logit[2,2])/sum(pred_logit)
+# The logistic model is similar to the linear model because people who are identify as transgender 
+# in GENDID_DESCRIBE have a positive and significant while people who are RACE Other have a negative and significant
+# relationship with getting vaccinated, the difference lies in the coefficients, the number change because
+# of the former was a linear model and this one is a logit model. However, we obtain a different result using
+# the confusion matrix. The matrix shows for logit the 719 and 20115 values are correct, while 2960 and 707 are incorrect
+# We can note the logit regression incorrectly predicts a greater amount of true/0s
+# compared to the predicted false/1s.
+# In this case, logistic regression is overall more accurate because more of the values are 
+# predicted correctly compared to the linear regression.
+# An exogenous variable is a variable that is not affected by other variables in the system
+# therefore our x variables are exogenous, since the values of race, marriage, gender, 
+# region, work and anxiety are determined outside the model.
+
+> load("~/Downloads/Household_Pulse_data.RData")
+> # Firstly we create the variable for those that got vaccinate, we will not be adding NA's.
+> Household_Pulse_data$vaxx <- (Household_Pulse_data$RECVDVACC == "yes got vaxx")
+> summary(Household_Pulse_data$vaxx)
+   Mode   FALSE    TRUE 
+logical    8788   60326 
+> table1 <- table(Household_Pulse_data$vaxx)
+> table1
+
+FALSE  TRUE 
+ 8788 60326 
+> prop.table(table1)
+
+    FALSE      TRUE 
+0.1271522 0.8728478 
+> # Then we created a table to demonstrate the proportion of those that are and are not vaccinated, 
+> # where we find that about 12.7 percent are not vaccinated and 87.3 percent are vaccinated.
+> # Then we create a subset for people from 25 to 65 years old.
+> use_varb <- (Household_Pulse_data$TBIRTH_YEAR >= 1956) & (Household_Pulse_data$TBIRTH_YEAR <= 1996)
+> dat_use1 <- subset(Household_Pulse_data,use_varb) 
+> summary(dat_use1)
+        RHISPANIC       RRACE                EEDUC               MS        EGENID_BIRTH       GENID_DESCRIBE 
+ Not Hispanic:43835   White:39405   less than hs:  318   NA       :  589   male  :18445   NA         :  724  
+ Hispanic    : 5150   Black: 4248   some hs     :  684   married  :29268   female:30540   male       :17951  
+                      Asian: 2861   HS diploma  : 5410   widowed  : 1174                  female     :29669  
+                      Other: 2471   some coll   : 9776   divorced : 7088                  transgender:  137  
+                                    assoc deg   : 5565   separated: 1032                  other      :  504  
+                                    bach deg    :14906   never    : 9834                                     
+                                    adv deg     :12326                                                       
+      SEXUAL_ORIENTATION                      KIDS_LT5Y                         KIDS_5_11Y   
+ NA            :  967    NA                        :42624   NA                       :38860  
+ gay or lesbian: 1866    Yes children under 5 in HH: 6361   Yes children 5 - 11 in HH:10125  
+ straight      :43107                                                                        
+ bisexual      : 1750                                                                        
+ something else:  686                                                                        
+ dont know     :  609                                                                        
+                                                                                             
+                     KIDS_12_17Y                                 ENROLLNONE                  RECVDVACC    
+ NA                        :38854   NA                                :45069   NA                 :  591  
+ Yes children 12 - 17 in HH:10131   children not in any type of school: 3916   yes got vaxx       :41667  
+                                                                               no did not get vaxx: 6727  
+                                                                                                          
+                                                                                                          
+                                                                                                          
+                                                                                                          
+                      DOSESRV                          GETVACRV                                   KIDDOSES    
+ NA                       : 7491   NA                      :42276   NA                                :39067  
+ yes got all doses        :39897   definitely will get vaxx:  482   Yes kids got or will get all doses: 6558  
+ yes plan to get all doses: 1411   probably will get vaxx  :  611   no kids did not or will not       : 3360  
+ no will not get all doses:  186   unsure about vaxx       : 1380                                             
+                                   probably not            : 1361                                             
+                                   definitely not          : 2875                                             
+                                                                                                              
+                    KIDGETVAC                          HADCOVID                      WRKLOSSRV    
+ NA                      :45588   NA                       : 1000   NA                    : 1440  
+ definitely will get vaxx:  434   yes doctor told had covid: 7314   yes recent HH job loss: 6590  
+ probably will get vaxx  :  401   no did not               :40372   no recent HH job loss :40955  
+ unsure about vaxx       :  689   not sure                 :  299                                 
+ probably not            :  550                                                                   
+ definitely not          :  959                                                                   
+ dont know yet           :  364                                                                   
+                          ANYWORK                     KINDWORK                RSNNOWRKRV   
+ NA                           : 1564   NA                 :15561   NA              :36562  
+ yes employment in last 7 days:33941   work for govt      : 5805   other           : 3291  
+ no employment in last 7 days :13480   work for private co:18785   retired         : 2963  
+                                       work for nonprofit : 4495   sick or disabled: 1273  
+                                       self employed      : 3722   caring for kids : 1267  
+                                       work in family biz :  617   laid off        :  969  
+                                                                   (Other)         : 2660  
+                                      CHLDCARE                              CURFOODSUF   
+ NA                                       :38853   NA                            : 5068  
+ yes impacts to childcare because pandemic: 2465   had enough food               :33630  
+ no                                       : 7667   had enough but not what wanted: 7627  
+                                                   sometimes not enough food     : 2097  
+                                                   often not enough food         :  563  
+                                                                                         
+                                                                                         
+                                               CHILDFOOD                                                ANXIOUS     
+ NA                                                 :44549   NA                                             : 5969  
+ often kids not eating enough because couldnt afford:  241   no anxiety over past 2 wks                     :16024  
+ sometimes kids not eating enough                   : 1106   several days anxiety over past 2 wks           :14802  
+ kids got enough food                               : 3089   more than half the days anxiety over past 2 wks: 4965  
+                                                             nearly every day anxiety                       : 7225  
+                                                                                                                    
+                                                                                                                    
+                                             WORRY                                 TENURE     
+ NA                                             : 6009   NA                           : 8282  
+ no worry over past 2 wks                       :20047   housing owned free and clear : 8356  
+ several days worried over past 2 wks           :13637   housing owned with mortgage  :21888  
+ more than half the days worried over past 2 wks: 4047   housing rented               : 9966  
+ nearly every day worry                         : 5245   housing occupied without rent:  493  
+                                                                                              
+                                                                                              
+                                LIVQTRRV                RENTCUR                     MORTCUR     
+ live in detached 1 family          :28884   NA             :39041   NA                 :27160  
+ NA                                 : 8439   current on rent: 8795   current on mortgage:20625  
+ live in bldg w 5+ apts             : 4732   behind on rent : 1149   behind on mortgage : 1200  
+ live in 1 family attached to others: 3217                                                      
+ live in building with 3-4 apts     : 1304                                                      
+ live in mobile home                : 1240                                                      
+ (Other)                            : 1169                                                      
+                                        EVICT                                                FORCLOSE    
+ NA                                        :47876   NA                                           :47802  
+ very likely evicted in next 2 months      :  187   very likely forclosed in next 2 months       :   58  
+ somewhat likely evicted in next 2 months  :  346   somewhat likely forclosed in next 2 months   :  200  
+ not very likely evicted in next 2 months  :  313   not very likely forclosed in next 2 months   :  399  
+ not at all likely evicted in next 2 months:  263   not at all forclosed evicted in next 2 months:  526  
+                                                                                                         
+                                                                                                         
+        EST_ST                        PRIVHLTH                      PUBHLTH            REGION     
+ California: 3854   has private health ins:35149   has public health ins: 8222   Northeast: 7368  
+ Texas     : 2738   no private health ins : 6584   no public health ins :31140   South    :16009  
+ Washington: 1911   NA                    : 7252   NA                   : 9623   Midwest  : 9719  
+ Florida   : 1750                                                                West     :15889  
+ Utah      : 1418                                                                                 
+ Oregon    : 1409                                                                                 
+ (Other)   :35905                                                                                 
+                   INCOME       TBIRTH_YEAR   Num_kids_Pub_School Num_kids_Priv_School Num_kids_homeschool
+ NA                   :10423   Min.   :1956   Min.   :0.00        Min.   :0.00         Min.   :0.00       
+ HH income $100k - 149: 7636   1st Qu.:1964   1st Qu.:1.00        1st Qu.:1.00         1st Qu.:0.00       
+ HH income $50k - 74.9: 6139   Median :1973   Median :2.00        Median :1.00         Median :1.00       
+ HH income $75 - 99.9 : 5384   Mean   :1974   Mean   :1.72        Mean   :1.05         Mean   :0.89       
+ HH income $200k +    : 4940   3rd Qu.:1983   3rd Qu.:2.00        3rd Qu.:2.00         3rd Qu.:2.00       
+ HH income $150 - 199 : 3994   Max.   :1996   Max.   :4.00        Max.   :2.00         Max.   :2.00       
+ (Other)              :10469                  NA's   :35950       NA's   :46534        NA's   :47466      
+        Works_onsite            works_remote            Shop_in_store                   eat_in_restaurant    vaxx        
+ NA           : 4419   NA             : 5376   NA              : 4892   NA                       : 5019   Mode :logical  
+ worked onsite:29639   worked remotely:19541   shopped in store:38413   eat at restaurant indoors:22701   FALSE:7318     
+ no           :14927   no             :24068   no              : 5680   no                       :21265   TRUE :41667    
+                                                                                                                         
+                                                                                                                         
+                                                                                                                         
+                                                                                                                         
+> d_educ <- data.frame(model.matrix(~ dat_use1$EEDUC))
+> summary(d_educ)
+  X.Intercept. dat_use1.EEDUCsome.hs dat_use1.EEDUCHS.diploma dat_use1.EEDUCsome.coll dat_use1.EEDUCassoc.deg
+ Min.   :1     Min.   :0.00000       Min.   :0.0000           Min.   :0.0000          Min.   :0.0000         
+ 1st Qu.:1     1st Qu.:0.00000       1st Qu.:0.0000           1st Qu.:0.0000          1st Qu.:0.0000         
+ Median :1     Median :0.00000       Median :0.0000           Median :0.0000          Median :0.0000         
+ Mean   :1     Mean   :0.01396       Mean   :0.1104           Mean   :0.1996          Mean   :0.1136         
+ 3rd Qu.:1     3rd Qu.:0.00000       3rd Qu.:0.0000           3rd Qu.:0.0000          3rd Qu.:0.0000         
+ Max.   :1     Max.   :1.00000       Max.   :1.0000           Max.   :1.0000          Max.   :1.0000         
+ dat_use1.EEDUCbach.deg dat_use1.EEDUCadv.deg
+ Min.   :0.0000         Min.   :0.0000       
+ 1st Qu.:0.0000         1st Qu.:0.0000       
+ Median :0.0000         Median :0.0000       
+ Mean   :0.3043         Mean   :0.2516       
+ 3rd Qu.:1.0000         3rd Qu.:1.0000       
+ Max.   :1.0000         Max.   :1.0000       
+> levels(dat_use1$EEDUC)
+[1] "less than hs" "some hs"      "HS diploma"   "some coll"    "assoc deg"    "bach deg"     "adv deg"     
+> d_marstat <- data.frame(model.matrix(~ dat_use1$MS))
+> d_race <- data.frame(model.matrix(~ dat_use1$RRACE))
+> summary(d_race)
+  X.Intercept. dat_use1.RRACEBlack dat_use1.RRACEAsian dat_use1.RRACEOther
+ Min.   :1     Min.   :0.00000     Min.   :0.00000     Min.   :0.00000    
+ 1st Qu.:1     1st Qu.:0.00000     1st Qu.:0.00000     1st Qu.:0.00000    
+ Median :1     Median :0.00000     Median :0.00000     Median :0.00000    
+ Mean   :1     Mean   :0.08672     Mean   :0.05841     Mean   :0.05044    
+ 3rd Qu.:1     3rd Qu.:0.00000     3rd Qu.:0.00000     3rd Qu.:0.00000    
+ Max.   :1     Max.   :1.00000     Max.   :1.00000     Max.   :1.00000    
+> d_hispanic <- data.frame(model.matrix(~ dat_use1$RHISPANIC))
+> d_gender <- data.frame(model.matrix(~ dat_use1$GENID_DESCRIBE))
+> d_region <- data.frame(model.matrix(~ dat_use1$REGION))
+> d_vaxx <- data.frame(model.matrix(~ dat_use1$vaxx))
+> summary(d_vaxx)
+  X.Intercept. dat_use1.vaxxTRUE
+ Min.   :1     Min.   :0.0000   
+ 1st Qu.:1     1st Qu.:1.0000   
+ Median :1     Median :1.0000   
+ Mean   :1     Mean   :0.8506   
+ 3rd Qu.:1     3rd Qu.:1.0000   
+ Max.   :1     Max.   :1.0000   
+> dat_for_analysis_sub <- data.frame(
++   d_vaxx[,2],
++   dat_use1$TBIRTH_YEAR[!is.na(dat_use1$vaxx)],
++   d_educ[!is.na(dat_use1$vaxx),2:7],
++   d_marstat[!is.na(dat_use1$vaxx),2:6],
++   d_race[!is.na(dat_use1$vaxx),2:4],
++   d_hispanic[!is.na(dat_use1$vaxx),2],
++   d_gender[!is.na(dat_use1$vaxx),2:5],
++   d_region[!is.na(dat_use1$vaxx),2:4]) 
+> names(dat_for_analysis_sub) <- sub("dat_use1.","",names(dat_for_analysis_sub))
+> names(dat_for_analysis_sub)[1] <- "vaxx"
+> names(dat_for_analysis_sub)[2] <- "TBIRTH_YEAR"
+> names(dat_for_analysis_sub)[17] <- "Hispanic"
+> summary(dat_for_analysis_sub)
+      vaxx         TBIRTH_YEAR    EEDUCsome.hs     EEDUCHS.diploma  EEDUCsome.coll   EEDUCassoc.deg   EEDUCbach.deg   
+ Min.   :0.0000   Min.   :1956   Min.   :0.00000   Min.   :0.0000   Min.   :0.0000   Min.   :0.0000   Min.   :0.0000  
+ 1st Qu.:1.0000   1st Qu.:1964   1st Qu.:0.00000   1st Qu.:0.0000   1st Qu.:0.0000   1st Qu.:0.0000   1st Qu.:0.0000  
+ Median :1.0000   Median :1973   Median :0.00000   Median :0.0000   Median :0.0000   Median :0.0000   Median :0.0000  
+ Mean   :0.8506   Mean   :1974   Mean   :0.01396   Mean   :0.1104   Mean   :0.1996   Mean   :0.1136   Mean   :0.3043  
+ 3rd Qu.:1.0000   3rd Qu.:1983   3rd Qu.:0.00000   3rd Qu.:0.0000   3rd Qu.:0.0000   3rd Qu.:0.0000   3rd Qu.:1.0000  
+ Max.   :1.0000   Max.   :1996   Max.   :1.00000   Max.   :1.0000   Max.   :1.0000   Max.   :1.0000   Max.   :1.0000  
+  EEDUCadv.deg      MSmarried        MSwidowed         MSdivorced      MSseparated         MSnever      
+ Min.   :0.0000   Min.   :0.0000   Min.   :0.00000   Min.   :0.0000   Min.   :0.00000   Min.   :0.0000  
+ 1st Qu.:0.0000   1st Qu.:0.0000   1st Qu.:0.00000   1st Qu.:0.0000   1st Qu.:0.00000   1st Qu.:0.0000  
+ Median :0.0000   Median :1.0000   Median :0.00000   Median :0.0000   Median :0.00000   Median :0.0000  
+ Mean   :0.2516   Mean   :0.5975   Mean   :0.02397   Mean   :0.1447   Mean   :0.02107   Mean   :0.2008  
+ 3rd Qu.:1.0000   3rd Qu.:1.0000   3rd Qu.:0.00000   3rd Qu.:0.0000   3rd Qu.:0.00000   3rd Qu.:0.0000  
+ Max.   :1.0000   Max.   :1.0000   Max.   :1.00000   Max.   :1.0000   Max.   :1.00000   Max.   :1.0000  
+   RRACEBlack        RRACEAsian        RRACEOther         Hispanic      GENID_DESCRIBEmale GENID_DESCRIBEfemale
+ Min.   :0.00000   Min.   :0.00000   Min.   :0.00000   Min.   :0.0000   Min.   :0.0000     Min.   :0.0000      
+ 1st Qu.:0.00000   1st Qu.:0.00000   1st Qu.:0.00000   1st Qu.:0.0000   1st Qu.:0.0000     1st Qu.:0.0000      
+ Median :0.00000   Median :0.00000   Median :0.00000   Median :0.0000   Median :0.0000     Median :1.0000      
+ Mean   :0.08672   Mean   :0.05841   Mean   :0.05044   Mean   :0.1051   Mean   :0.3665     Mean   :0.6057      
+ 3rd Qu.:0.00000   3rd Qu.:0.00000   3rd Qu.:0.00000   3rd Qu.:0.0000   3rd Qu.:1.0000     3rd Qu.:1.0000      
+ Max.   :1.00000   Max.   :1.00000   Max.   :1.00000   Max.   :1.0000   Max.   :1.0000     Max.   :1.0000      
+ GENID_DESCRIBEtransgender GENID_DESCRIBEother  REGIONSouth     REGIONMidwest      REGIONWest    
+ Min.   :0.000000          Min.   :0.00000     Min.   :0.0000   Min.   :0.0000   Min.   :0.0000  
+ 1st Qu.:0.000000          1st Qu.:0.00000     1st Qu.:0.0000   1st Qu.:0.0000   1st Qu.:0.0000  
+ Median :0.000000          Median :0.00000     Median :0.0000   Median :0.0000   Median :0.0000  
+ Mean   :0.002797          Mean   :0.01029     Mean   :0.3268   Mean   :0.1984   Mean   :0.3244  
+ 3rd Qu.:0.000000          3rd Qu.:0.00000     3rd Qu.:1.0000   3rd Qu.:0.0000   3rd Qu.:1.0000  
+ Max.   :1.000000          Max.   :1.00000     Max.   :1.0000   Max.   :1.0000   Max.   :1.0000  
+> require("standardize")
+> set.seed(1)
+> NN <- length(dat_for_analysis_sub$vaxx)
+> restrict_1 <- (runif(NN) < 0.5) 
+> summary(restrict_1)
+   Mode   FALSE    TRUE 
+logical   24501   24484 
+> dat_train <- subset(dat_for_analysis_sub, restrict_1)
+> dat_test <- subset(dat_for_analysis_sub, !restrict_1)
+> sobj <- standardize(vaxx ~ TBIRTH_YEAR + EEDUCsome.hs + EEDUCHS.diploma + EEDUCsome.coll + EEDUCassoc.deg + EEDUCbach.deg + EEDUCadv.deg + 
++                       MSmarried + MSwidowed + MSdivorced + MSseparated + MSnever + RRACEBlack + RRACEAsian + RRACEOther +
++                       Hispanic + GENID_DESCRIBEmale + GENID_DESCRIBEfemale + GENID_DESCRIBEtransgender + GENID_DESCRIBEother +
++                       REGIONSouth + REGIONMidwest + REGIONWest
++                     , dat_train, family = binomial)
+> s_dat_test <- predict(sobj, dat_test)
+> #Linear
+> model_lpm1 <- lm(sobj$formula, data = sobj$data)
+> summary(model_lpm1)
+
+Call:
+lm(formula = sobj$formula, data = sobj$data)
+
+Residuals:
+     Min       1Q   Median       3Q      Max 
+-1.09253  0.01763  0.10553  0.18022  1.02469 
+
+Coefficients:
+                            Estimate Std. Error t value Pr(>|t|)    
+(Intercept)                 1.679913   0.068254  24.613  < 2e-16 ***
+TBIRTH_YEAR                -0.056098   0.002317 -24.214  < 2e-16 ***
+EEDUCsome.hs1              -0.051191   0.015986  -3.202 0.001365 ** 
+EEDUCHS.diploma1           -0.016273   0.013675  -1.190 0.234059    
+EEDUCsome.coll1             0.016757   0.013517   1.240 0.215093    
+EEDUCassoc.deg1             0.025977   0.013683   1.898 0.057651 .  
+EEDUCbach.deg1              0.073218   0.013463   5.439 5.42e-08 ***
+EEDUCadv.deg1               0.086845   0.013497   6.434 1.26e-10 ***
+MSmarried1                  0.156835   0.012149  12.910  < 2e-16 ***
+MSwidowed1                  0.140180   0.013938  10.057  < 2e-16 ***
+MSdivorced1                 0.136921   0.012409  11.034  < 2e-16 ***
+MSseparated1                0.144129   0.014193  10.155  < 2e-16 ***
+MSnever1                    0.164605   0.012346  13.333  < 2e-16 ***
+RRACEBlack1                -0.004016   0.003938  -1.020 0.307861    
+RRACEAsian1                 0.040029   0.004666   8.579  < 2e-16 ***
+RRACEOther1                -0.019816   0.004981  -3.978 6.97e-05 ***
+Hispanic1                   0.013646   0.003592   3.799 0.000146 ***
+GENID_DESCRIBEmale1         0.158362   0.011053  14.327  < 2e-16 ***
+GENID_DESCRIBEfemale1       0.157274   0.010998  14.300  < 2e-16 ***
+GENID_DESCRIBEtransgender1  0.199876   0.024534   8.147 3.91e-16 ***
+GENID_DESCRIBEother1        0.150482   0.015278   9.850  < 2e-16 ***
+REGIONSouth1               -0.026829   0.003361  -7.983 1.49e-15 ***
+REGIONMidwest1             -0.023252   0.003683  -6.313 2.79e-10 ***
+REGIONWest1                -0.014554   0.003380  -4.305 1.67e-05 ***
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Residual standard error: 0.3363 on 24460 degrees of freedom
+Multiple R-squared:  0.107,	Adjusted R-squared:  0.1061 
+F-statistic: 127.4 on 23 and 24460 DF,  p-value: < 2.2e-16
+
+> pred_vals_lpm <- predict(model_lpm1, s_dat_test)
+There were 22 warnings (use warnings() to see them)
+> pred_model_lpm1 <- (pred_vals_lpm > mean(pred_vals_lpm))
+> table(pred = pred_model_lpm1, true = dat_test$vaxx)
+       true
+pred        0     1
+  FALSE  2685  8437
+  TRUE    994 12385
+> # logit 
+> model_logit1 <- glm(sobj$formula, family = binomial, data = sobj$data)
+> summary(model_logit1)
+
+Call:
+glm(formula = sobj$formula, family = binomial, data = sobj$data)
+
+Deviance Residuals: 
+    Min       1Q   Median       3Q      Max  
+-3.0772   0.2816   0.4278   0.5894   2.6355  
+
+Coefficients:
+                           Estimate Std. Error z value Pr(>|z|)    
+(Intercept)                 7.32486    0.52534  13.943  < 2e-16 ***
+TBIRTH_YEAR                -0.49334    0.02124 -23.223  < 2e-16 ***
+EEDUCsome.hs1              -0.25884    0.11233  -2.304 0.021213 *  
+EEDUCHS.diploma1           -0.07605    0.09863  -0.771 0.440642    
+EEDUCsome.coll1             0.12390    0.09788   1.266 0.205591    
+EEDUCassoc.deg1             0.18655    0.09942   1.876 0.060610 .  
+EEDUCbach.deg1              0.59963    0.09851   6.087 1.15e-09 ***
+EEDUCadv.deg1               0.80445    0.10007   8.039 9.07e-16 ***
+MSmarried1                  0.88458    0.08331  10.618  < 2e-16 ***
+MSwidowed1                  0.72370    0.10169   7.117 1.10e-12 ***
+MSdivorced1                 0.71679    0.08578   8.356  < 2e-16 ***
+MSseparated1                0.79369    0.10164   7.809 5.79e-15 ***
+MSnever1                    0.95811    0.08568  11.183  < 2e-16 ***
+RRACEBlack1                -0.02776    0.03250  -0.854 0.393079    
+RRACEAsian1                 0.63105    0.07110   8.875  < 2e-16 ***
+RRACEOther1                -0.14025    0.03894  -3.601 0.000316 ***
+Hispanic1                   0.10833    0.03092   3.503 0.000460 ***
+GENID_DESCRIBEmale1         0.92476    0.07424  12.456  < 2e-16 ***
+GENID_DESCRIBEfemale1       0.90483    0.07352  12.307  < 2e-16 ***
+GENID_DESCRIBEtransgender1  1.27460    0.22065   5.777 7.62e-09 ***
+GENID_DESCRIBEother1        0.88421    0.11562   7.648 2.04e-14 ***
+REGIONSouth1               -0.26386    0.03298  -8.001 1.23e-15 ***
+REGIONMidwest1             -0.23968    0.03535  -6.780 1.20e-11 ***
+REGIONWest1                -0.16142    0.03374  -4.784 1.72e-06 ***
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+(Dispersion parameter for binomial family taken to be 1)
+
+    Null deviance: 20582  on 24483  degrees of freedom
+Residual deviance: 18094  on 24460  degrees of freedom
+AIC: 18142
+
+Number of Fisher Scoring iterations: 6
+
+> pred_vals <- predict(model_logit1, s_dat_test, type = "response")
+There were 22 warnings (use warnings() to see them)
+> pred_model_logit1 <- (pred_vals > 0.5)
+> table(pred = pred_model_logit1, true = dat_test$vaxx)
+       true
+pred        0     1
+  FALSE   238   119
+  TRUE   3441 20703
+  
+  Our model
+> Household_Pulse_data$vaxx <- (Household_Pulse_data$RECVDVACC == "yes got vaxx")
+> use_varb <- (Household_Pulse_data$TBIRTH_YEAR >= 1956) & (Household_Pulse_data$TBIRTH_YEAR <= 1996)
+> dat_use1 <- subset(Household_Pulse_data,use_varb) 
+> summary(dat_use1)
+        RHISPANIC       RRACE                EEDUC               MS        EGENID_BIRTH       GENID_DESCRIBE 
+ Not Hispanic:43835   White:39405   less than hs:  318   NA       :  589   male  :18445   NA         :  724  
+ Hispanic    : 5150   Black: 4248   some hs     :  684   married  :29268   female:30540   male       :17951  
+                      Asian: 2861   HS diploma  : 5410   widowed  : 1174                  female     :29669  
+                      Other: 2471   some coll   : 9776   divorced : 7088                  transgender:  137  
+                                    assoc deg   : 5565   separated: 1032                  other      :  504  
+                                    bach deg    :14906   never    : 9834                                     
+                                    adv deg     :12326                                                       
+      SEXUAL_ORIENTATION                      KIDS_LT5Y                         KIDS_5_11Y   
+ NA            :  967    NA                        :42624   NA                       :38860  
+ gay or lesbian: 1866    Yes children under 5 in HH: 6361   Yes children 5 - 11 in HH:10125  
+ straight      :43107                                                                        
+ bisexual      : 1750                                                                        
+ something else:  686                                                                        
+ dont know     :  609                                                                        
+                                                                                             
+                     KIDS_12_17Y                                 ENROLLNONE                  RECVDVACC    
+ NA                        :38854   NA                                :45069   NA                 :  591  
+ Yes children 12 - 17 in HH:10131   children not in any type of school: 3916   yes got vaxx       :41667  
+                                                                               no did not get vaxx: 6727  
+                                                                                                          
+                                                                                                          
+                                                                                                          
+                                                                                                          
+                      DOSESRV                          GETVACRV                                   KIDDOSES    
+ NA                       : 7491   NA                      :42276   NA                                :39067  
+ yes got all doses        :39897   definitely will get vaxx:  482   Yes kids got or will get all doses: 6558  
+ yes plan to get all doses: 1411   probably will get vaxx  :  611   no kids did not or will not       : 3360  
+ no will not get all doses:  186   unsure about vaxx       : 1380                                             
+                                   probably not            : 1361                                             
+                                   definitely not          : 2875                                             
+                                                                                                              
+                    KIDGETVAC                          HADCOVID                      WRKLOSSRV    
+ NA                      :45588   NA                       : 1000   NA                    : 1440  
+ definitely will get vaxx:  434   yes doctor told had covid: 7314   yes recent HH job loss: 6590  
+ probably will get vaxx  :  401   no did not               :40372   no recent HH job loss :40955  
+ unsure about vaxx       :  689   not sure                 :  299                                 
+ probably not            :  550                                                                   
+ definitely not          :  959                                                                   
+ dont know yet           :  364                                                                   
+                          ANYWORK                     KINDWORK                RSNNOWRKRV   
+ NA                           : 1564   NA                 :15561   NA              :36562  
+ yes employment in last 7 days:33941   work for govt      : 5805   other           : 3291  
+ no employment in last 7 days :13480   work for private co:18785   retired         : 2963  
+                                       work for nonprofit : 4495   sick or disabled: 1273  
+                                       self employed      : 3722   caring for kids : 1267  
+                                       work in family biz :  617   laid off        :  969  
+                                                                   (Other)         : 2660  
+                                      CHLDCARE                              CURFOODSUF   
+ NA                                       :38853   NA                            : 5068  
+ yes impacts to childcare because pandemic: 2465   had enough food               :33630  
+ no                                       : 7667   had enough but not what wanted: 7627  
+                                                   sometimes not enough food     : 2097  
+                                                   often not enough food         :  563  
+                                                                                         
+                                                                                         
+                                               CHILDFOOD                                                ANXIOUS     
+ NA                                                 :44549   NA                                             : 5969  
+ often kids not eating enough because couldnt afford:  241   no anxiety over past 2 wks                     :16024  
+ sometimes kids not eating enough                   : 1106   several days anxiety over past 2 wks           :14802  
+ kids got enough food                               : 3089   more than half the days anxiety over past 2 wks: 4965  
+                                                             nearly every day anxiety                       : 7225  
+                                                                                                                    
+                                                                                                                    
+                                             WORRY                                 TENURE     
+ NA                                             : 6009   NA                           : 8282  
+ no worry over past 2 wks                       :20047   housing owned free and clear : 8356  
+ several days worried over past 2 wks           :13637   housing owned with mortgage  :21888  
+ more than half the days worried over past 2 wks: 4047   housing rented               : 9966  
+ nearly every day worry                         : 5245   housing occupied without rent:  493  
+                                                                                              
+                                                                                              
+                                LIVQTRRV                RENTCUR                     MORTCUR     
+ live in detached 1 family          :28884   NA             :39041   NA                 :27160  
+ NA                                 : 8439   current on rent: 8795   current on mortgage:20625  
+ live in bldg w 5+ apts             : 4732   behind on rent : 1149   behind on mortgage : 1200  
+ live in 1 family attached to others: 3217                                                      
+ live in building with 3-4 apts     : 1304                                                      
+ live in mobile home                : 1240                                                      
+ (Other)                            : 1169                                                      
+                                        EVICT                                                FORCLOSE    
+ NA                                        :47876   NA                                           :47802  
+ very likely evicted in next 2 months      :  187   very likely forclosed in next 2 months       :   58  
+ somewhat likely evicted in next 2 months  :  346   somewhat likely forclosed in next 2 months   :  200  
+ not very likely evicted in next 2 months  :  313   not very likely forclosed in next 2 months   :  399  
+ not at all likely evicted in next 2 months:  263   not at all forclosed evicted in next 2 months:  526  
+                                                                                                         
+                                                                                                         
+        EST_ST                        PRIVHLTH                      PUBHLTH            REGION     
+ California: 3854   has private health ins:35149   has public health ins: 8222   Northeast: 7368  
+ Texas     : 2738   no private health ins : 6584   no public health ins :31140   South    :16009  
+ Washington: 1911   NA                    : 7252   NA                   : 9623   Midwest  : 9719  
+ Florida   : 1750                                                                West     :15889  
+ Utah      : 1418                                                                                 
+ Oregon    : 1409                                                                                 
+ (Other)   :35905                                                                                 
+                   INCOME       TBIRTH_YEAR   Num_kids_Pub_School Num_kids_Priv_School Num_kids_homeschool
+ NA                   :10423   Min.   :1956   Min.   :0.00        Min.   :0.00         Min.   :0.00       
+ HH income $100k - 149: 7636   1st Qu.:1964   1st Qu.:1.00        1st Qu.:1.00         1st Qu.:0.00       
+ HH income $50k - 74.9: 6139   Median :1973   Median :2.00        Median :1.00         Median :1.00       
+ HH income $75 - 99.9 : 5384   Mean   :1974   Mean   :1.72        Mean   :1.05         Mean   :0.89       
+ HH income $200k +    : 4940   3rd Qu.:1983   3rd Qu.:2.00        3rd Qu.:2.00         3rd Qu.:2.00       
+ HH income $150 - 199 : 3994   Max.   :1996   Max.   :4.00        Max.   :2.00         Max.   :2.00       
+ (Other)              :10469                  NA's   :35950       NA's   :46534        NA's   :47466      
+        Works_onsite            works_remote            Shop_in_store                   eat_in_restaurant    vaxx        
+ NA           : 4419   NA             : 5376   NA              : 4892   NA                       : 5019   Mode :logical  
+ worked onsite:29639   worked remotely:19541   shopped in store:38413   eat at restaurant indoors:22701   FALSE:7318     
+ no           :14927   no             :24068   no              : 5680   no                       :21265   TRUE :41667    
+                                                                                                                         
+                                                                                                                         
+                                                                                                                         
+                                                                                                                         
+> d_tbirth_year <- data.frame(model.matrix(~ dat_use1$TBIRTH_YEAR))
+> d_educ <- data.frame(model.matrix(~ dat_use1$EEDUC))
+> d_marstat <- data.frame(model.matrix(~ dat_use1$MS))
+> d_race <- data.frame(model.matrix(~ dat_use1$RRACE))
+> d_hispanic <- data.frame(model.matrix(~ dat_use1$RHISPANIC))
+> d_gender <- data.frame(model.matrix(~ dat_use1$GENID_DESCRIBE))
+> d_region <- data.frame(model.matrix(~ dat_use1$REGION))
+> d_vaxx <- data.frame(model.matrix(~ dat_use1$vaxx)) 
+> d_onsite <- data.frame(model.matrix(~ dat_use1$Works_onsite)) 
+> d_anxious <- data.frame(model.matrix(~ dat_use1$ANXIOUS))
+> summary(d_tbirth_year)
+  X.Intercept. dat_use1.TBIRTH_YEAR
+ Min.   :1     Min.   :1956        
+ 1st Qu.:1     1st Qu.:1964        
+ Median :1     Median :1973        
+ Mean   :1     Mean   :1974        
+ 3rd Qu.:1     3rd Qu.:1983        
+ Max.   :1     Max.   :1996        
+> summary(d_educ)
+  X.Intercept. dat_use1.EEDUCsome.hs dat_use1.EEDUCHS.diploma dat_use1.EEDUCsome.coll dat_use1.EEDUCassoc.deg
+ Min.   :1     Min.   :0.00000       Min.   :0.0000           Min.   :0.0000          Min.   :0.0000         
+ 1st Qu.:1     1st Qu.:0.00000       1st Qu.:0.0000           1st Qu.:0.0000          1st Qu.:0.0000         
+ Median :1     Median :0.00000       Median :0.0000           Median :0.0000          Median :0.0000         
+ Mean   :1     Mean   :0.01396       Mean   :0.1104           Mean   :0.1996          Mean   :0.1136         
+ 3rd Qu.:1     3rd Qu.:0.00000       3rd Qu.:0.0000           3rd Qu.:0.0000          3rd Qu.:0.0000         
+ Max.   :1     Max.   :1.00000       Max.   :1.0000           Max.   :1.0000          Max.   :1.0000         
+ dat_use1.EEDUCbach.deg dat_use1.EEDUCadv.deg
+ Min.   :0.0000         Min.   :0.0000       
+ 1st Qu.:0.0000         1st Qu.:0.0000       
+ Median :0.0000         Median :0.0000       
+ Mean   :0.3043         Mean   :0.2516       
+ 3rd Qu.:1.0000         3rd Qu.:1.0000       
+ Max.   :1.0000         Max.   :1.0000       
+> summary(d_marstat)
+  X.Intercept. dat_use1.MSmarried dat_use1.MSwidowed dat_use1.MSdivorced dat_use1.MSseparated dat_use1.MSnever
+ Min.   :1     Min.   :0.0000     Min.   :0.00000    Min.   :0.0000      Min.   :0.00000      Min.   :0.0000  
+ 1st Qu.:1     1st Qu.:0.0000     1st Qu.:0.00000    1st Qu.:0.0000      1st Qu.:0.00000      1st Qu.:0.0000  
+ Median :1     Median :1.0000     Median :0.00000    Median :0.0000      Median :0.00000      Median :0.0000  
+ Mean   :1     Mean   :0.5975     Mean   :0.02397    Mean   :0.1447      Mean   :0.02107      Mean   :0.2008  
+ 3rd Qu.:1     3rd Qu.:1.0000     3rd Qu.:0.00000    3rd Qu.:0.0000      3rd Qu.:0.00000      3rd Qu.:0.0000  
+ Max.   :1     Max.   :1.0000     Max.   :1.00000    Max.   :1.0000      Max.   :1.00000      Max.   :1.0000  
+> summary(d_race)
+  X.Intercept. dat_use1.RRACEBlack dat_use1.RRACEAsian dat_use1.RRACEOther
+ Min.   :1     Min.   :0.00000     Min.   :0.00000     Min.   :0.00000    
+ 1st Qu.:1     1st Qu.:0.00000     1st Qu.:0.00000     1st Qu.:0.00000    
+ Median :1     Median :0.00000     Median :0.00000     Median :0.00000    
+ Mean   :1     Mean   :0.08672     Mean   :0.05841     Mean   :0.05044    
+ 3rd Qu.:1     3rd Qu.:0.00000     3rd Qu.:0.00000     3rd Qu.:0.00000    
+ Max.   :1     Max.   :1.00000     Max.   :1.00000     Max.   :1.00000    
+> summary(d_hispanic)
+  X.Intercept. dat_use1.RHISPANICHispanic
+ Min.   :1     Min.   :0.0000            
+ 1st Qu.:1     1st Qu.:0.0000            
+ Median :1     Median :0.0000            
+ Mean   :1     Mean   :0.1051            
+ 3rd Qu.:1     3rd Qu.:0.0000            
+ Max.   :1     Max.   :1.0000            
+> summary(d_gender)
+  X.Intercept. dat_use1.GENID_DESCRIBEmale dat_use1.GENID_DESCRIBEfemale dat_use1.GENID_DESCRIBEtransgender
+ Min.   :1     Min.   :0.0000              Min.   :0.0000                Min.   :0.000000                  
+ 1st Qu.:1     1st Qu.:0.0000              1st Qu.:0.0000                1st Qu.:0.000000                  
+ Median :1     Median :0.0000              Median :1.0000                Median :0.000000                  
+ Mean   :1     Mean   :0.3665              Mean   :0.6057                Mean   :0.002797                  
+ 3rd Qu.:1     3rd Qu.:1.0000              3rd Qu.:1.0000                3rd Qu.:0.000000                  
+ Max.   :1     Max.   :1.0000              Max.   :1.0000                Max.   :1.000000                  
+ dat_use1.GENID_DESCRIBEother
+ Min.   :0.00000             
+ 1st Qu.:0.00000             
+ Median :0.00000             
+ Mean   :0.01029             
+ 3rd Qu.:0.00000             
+ Max.   :1.00000             
+> summary(d_region)
+  X.Intercept. dat_use1.REGIONSouth dat_use1.REGIONMidwest dat_use1.REGIONWest
+ Min.   :1     Min.   :0.0000       Min.   :0.0000         Min.   :0.0000     
+ 1st Qu.:1     1st Qu.:0.0000       1st Qu.:0.0000         1st Qu.:0.0000     
+ Median :1     Median :0.0000       Median :0.0000         Median :0.0000     
+ Mean   :1     Mean   :0.3268       Mean   :0.1984         Mean   :0.3244     
+ 3rd Qu.:1     3rd Qu.:1.0000       3rd Qu.:0.0000         3rd Qu.:1.0000     
+ Max.   :1     Max.   :1.0000       Max.   :1.0000         Max.   :1.0000     
+> summary(d_vaxx)
+  X.Intercept. dat_use1.vaxxTRUE
+ Min.   :1     Min.   :0.0000   
+ 1st Qu.:1     1st Qu.:1.0000   
+ Median :1     Median :1.0000   
+ Mean   :1     Mean   :0.8506   
+ 3rd Qu.:1     3rd Qu.:1.0000   
+ Max.   :1     Max.   :1.0000   
+> summary(dat_use1$vaxx)
+   Mode   FALSE    TRUE 
+logical    7318   41667 
+> summary(d_onsite)
+  X.Intercept. dat_use1.Works_onsiteworked.onsite dat_use1.Works_onsiteno
+ Min.   :1     Min.   :0.0000                     Min.   :0.0000         
+ 1st Qu.:1     1st Qu.:0.0000                     1st Qu.:0.0000         
+ Median :1     Median :1.0000                     Median :0.0000         
+ Mean   :1     Mean   :0.6051                     Mean   :0.3047         
+ 3rd Qu.:1     3rd Qu.:1.0000                     3rd Qu.:1.0000         
+ Max.   :1     Max.   :1.0000                     Max.   :1.0000         
+> summary(d_anxious)
+  X.Intercept. dat_use1.ANXIOUSno.anxiety.over.past.2.wks dat_use1.ANXIOUSseveral.days.anxiety.over.past.2.wks
+ Min.   :1     Min.   :0.0000                             Min.   :0.0000                                      
+ 1st Qu.:1     1st Qu.:0.0000                             1st Qu.:0.0000                                      
+ Median :1     Median :0.0000                             Median :0.0000                                      
+ Mean   :1     Mean   :0.3271                             Mean   :0.3022                                      
+ 3rd Qu.:1     3rd Qu.:1.0000                             3rd Qu.:1.0000                                      
+ Max.   :1     Max.   :1.0000                             Max.   :1.0000                                      
+ dat_use1.ANXIOUSmore.than.half.the.days.anxiety.over.past.2.wks dat_use1.ANXIOUSnearly.every.day.anxiety
+ Min.   :0.0000                                                  Min.   :0.0000                          
+ 1st Qu.:0.0000                                                  1st Qu.:0.0000                          
+ Median :0.0000                                                  Median :0.0000                          
+ Mean   :0.1014                                                  Mean   :0.1475                          
+ 3rd Qu.:0.0000                                                  3rd Qu.:0.0000                          
+ Max.   :1.0000                                                  Max.   :1.0000                          
+> # We add the variable works on site to add more variety to the regression.
+> # We can see that in the new data frames by looking into the summary that their levels
+> # are still intact
+> # Not only does the data frame change them from from factor to numeric, but we can also
+> # create our own data frame to look at a handful of meaningful variables.
+> dat_for_analysis_sub <- data.frame(d_vaxx[,2],
++   dat_use1$TBIRTH_YEAR[!is.na(dat_use1$vaxx)],
++   d_educ[!is.na(dat_use1$vaxx),2:7],
++   d_marstat[!is.na(dat_use1$vaxx),2:6],
++   d_race[!is.na(dat_use1$vaxx),2:4],
++   d_hispanic[!is.na(dat_use1$vaxx),2],
++   d_gender[!is.na(dat_use1$vaxx),2:5],
++   d_region[!is.na(dat_use1$vaxx),2:4],
++   d_onsite[!is.na(dat_use1$vaxx),2:3],
++   d_anxious[!is.na(dat_use1$vaxx),2:4])
+> summary(dat_for_analysis_sub)
+  d_vaxx...2.     dat_use1.TBIRTH_YEAR..is.na.dat_use1.vaxx.. dat_use1.EEDUCsome.hs dat_use1.EEDUCHS.diploma
+ Min.   :0.0000   Min.   :1956                                Min.   :0.00000       Min.   :0.0000          
+ 1st Qu.:1.0000   1st Qu.:1964                                1st Qu.:0.00000       1st Qu.:0.0000          
+ Median :1.0000   Median :1973                                Median :0.00000       Median :0.0000          
+ Mean   :0.8506   Mean   :1974                                Mean   :0.01396       Mean   :0.1104          
+ 3rd Qu.:1.0000   3rd Qu.:1983                                3rd Qu.:0.00000       3rd Qu.:0.0000          
+ Max.   :1.0000   Max.   :1996                                Max.   :1.00000       Max.   :1.0000          
+ dat_use1.EEDUCsome.coll dat_use1.EEDUCassoc.deg dat_use1.EEDUCbach.deg dat_use1.EEDUCadv.deg dat_use1.MSmarried
+ Min.   :0.0000          Min.   :0.0000          Min.   :0.0000         Min.   :0.0000        Min.   :0.0000    
+ 1st Qu.:0.0000          1st Qu.:0.0000          1st Qu.:0.0000         1st Qu.:0.0000        1st Qu.:0.0000    
+ Median :0.0000          Median :0.0000          Median :0.0000         Median :0.0000        Median :1.0000    
+ Mean   :0.1996          Mean   :0.1136          Mean   :0.3043         Mean   :0.2516        Mean   :0.5975    
+ 3rd Qu.:0.0000          3rd Qu.:0.0000          3rd Qu.:1.0000         3rd Qu.:1.0000        3rd Qu.:1.0000    
+ Max.   :1.0000          Max.   :1.0000          Max.   :1.0000         Max.   :1.0000        Max.   :1.0000    
+ dat_use1.MSwidowed dat_use1.MSdivorced dat_use1.MSseparated dat_use1.MSnever dat_use1.RRACEBlack dat_use1.RRACEAsian
+ Min.   :0.00000    Min.   :0.0000      Min.   :0.00000      Min.   :0.0000   Min.   :0.00000     Min.   :0.00000    
+ 1st Qu.:0.00000    1st Qu.:0.0000      1st Qu.:0.00000      1st Qu.:0.0000   1st Qu.:0.00000     1st Qu.:0.00000    
+ Median :0.00000    Median :0.0000      Median :0.00000      Median :0.0000   Median :0.00000     Median :0.00000    
+ Mean   :0.02397    Mean   :0.1447      Mean   :0.02107      Mean   :0.2008   Mean   :0.08672     Mean   :0.05841    
+ 3rd Qu.:0.00000    3rd Qu.:0.0000      3rd Qu.:0.00000      3rd Qu.:0.0000   3rd Qu.:0.00000     3rd Qu.:0.00000    
+ Max.   :1.00000    Max.   :1.0000      Max.   :1.00000      Max.   :1.0000   Max.   :1.00000     Max.   :1.00000    
+ dat_use1.RRACEOther d_hispanic..is.na.dat_use1.vaxx...2. dat_use1.GENID_DESCRIBEmale dat_use1.GENID_DESCRIBEfemale
+ Min.   :0.00000     Min.   :0.0000                       Min.   :0.0000              Min.   :0.0000               
+ 1st Qu.:0.00000     1st Qu.:0.0000                       1st Qu.:0.0000              1st Qu.:0.0000               
+ Median :0.00000     Median :0.0000                       Median :0.0000              Median :1.0000               
+ Mean   :0.05044     Mean   :0.1051                       Mean   :0.3665              Mean   :0.6057               
+ 3rd Qu.:0.00000     3rd Qu.:0.0000                       3rd Qu.:1.0000              3rd Qu.:1.0000               
+ Max.   :1.00000     Max.   :1.0000                       Max.   :1.0000              Max.   :1.0000               
+ dat_use1.GENID_DESCRIBEtransgender dat_use1.GENID_DESCRIBEother dat_use1.REGIONSouth dat_use1.REGIONMidwest
+ Min.   :0.000000                   Min.   :0.00000              Min.   :0.0000       Min.   :0.0000        
+ 1st Qu.:0.000000                   1st Qu.:0.00000              1st Qu.:0.0000       1st Qu.:0.0000        
+ Median :0.000000                   Median :0.00000              Median :0.0000       Median :0.0000        
+ Mean   :0.002797                   Mean   :0.01029              Mean   :0.3268       Mean   :0.1984        
+ 3rd Qu.:0.000000                   3rd Qu.:0.00000              3rd Qu.:1.0000       3rd Qu.:0.0000        
+ Max.   :1.000000                   Max.   :1.00000              Max.   :1.0000       Max.   :1.0000        
+ dat_use1.REGIONWest dat_use1.Works_onsiteworked.onsite dat_use1.Works_onsiteno
+ Min.   :0.0000      Min.   :0.0000                     Min.   :0.0000         
+ 1st Qu.:0.0000      1st Qu.:0.0000                     1st Qu.:0.0000         
+ Median :0.0000      Median :1.0000                     Median :0.0000         
+ Mean   :0.3244      Mean   :0.6051                     Mean   :0.3047         
+ 3rd Qu.:1.0000      3rd Qu.:1.0000                     3rd Qu.:1.0000         
+ Max.   :1.0000      Max.   :1.0000                     Max.   :1.0000         
+ dat_use1.ANXIOUSno.anxiety.over.past.2.wks dat_use1.ANXIOUSseveral.days.anxiety.over.past.2.wks
+ Min.   :0.0000                             Min.   :0.0000                                      
+ 1st Qu.:0.0000                             1st Qu.:0.0000                                      
+ Median :0.0000                             Median :0.0000                                      
+ Mean   :0.3271                             Mean   :0.3022                                      
+ 3rd Qu.:1.0000                             3rd Qu.:1.0000                                      
+ Max.   :1.0000                             Max.   :1.0000                                      
+ dat_use1.ANXIOUSmore.than.half.the.days.anxiety.over.past.2.wks
+ Min.   :0.0000                                                 
+ 1st Qu.:0.0000                                                 
+ Median :0.0000                                                 
+ Mean   :0.1014                                                 
+ 3rd Qu.:0.0000                                                 
+ Max.   :1.0000                                                 
+> #these omit the first part of the factor, sometimes omits the NA factor, like in
+> # marital status, other times it removes the first variables, like in region it removes northeast.
+> names(dat_for_analysis_sub) <- sub("dat_use1.","",names(dat_for_analysis_sub))
+> summary(dat_for_analysis_sub)
+  d_vaxx...2.     TBIRTH_YEAR..is.na.dat_use1.vaxx..  EEDUCsome.hs     EEDUCHS.diploma  EEDUCsome.coll   EEDUCassoc.deg  
+ Min.   :0.0000   Min.   :1956                       Min.   :0.00000   Min.   :0.0000   Min.   :0.0000   Min.   :0.0000  
+ 1st Qu.:1.0000   1st Qu.:1964                       1st Qu.:0.00000   1st Qu.:0.0000   1st Qu.:0.0000   1st Qu.:0.0000  
+ Median :1.0000   Median :1973                       Median :0.00000   Median :0.0000   Median :0.0000   Median :0.0000  
+ Mean   :0.8506   Mean   :1974                       Mean   :0.01396   Mean   :0.1104   Mean   :0.1996   Mean   :0.1136  
+ 3rd Qu.:1.0000   3rd Qu.:1983                       3rd Qu.:0.00000   3rd Qu.:0.0000   3rd Qu.:0.0000   3rd Qu.:0.0000  
+ Max.   :1.0000   Max.   :1996                       Max.   :1.00000   Max.   :1.0000   Max.   :1.0000   Max.   :1.0000  
+ EEDUCbach.deg     EEDUCadv.deg      MSmarried        MSwidowed         MSdivorced      MSseparated         MSnever      
+ Min.   :0.0000   Min.   :0.0000   Min.   :0.0000   Min.   :0.00000   Min.   :0.0000   Min.   :0.00000   Min.   :0.0000  
+ 1st Qu.:0.0000   1st Qu.:0.0000   1st Qu.:0.0000   1st Qu.:0.00000   1st Qu.:0.0000   1st Qu.:0.00000   1st Qu.:0.0000  
+ Median :0.0000   Median :0.0000   Median :1.0000   Median :0.00000   Median :0.0000   Median :0.00000   Median :0.0000  
+ Mean   :0.3043   Mean   :0.2516   Mean   :0.5975   Mean   :0.02397   Mean   :0.1447   Mean   :0.02107   Mean   :0.2008  
+ 3rd Qu.:1.0000   3rd Qu.:1.0000   3rd Qu.:1.0000   3rd Qu.:0.00000   3rd Qu.:0.0000   3rd Qu.:0.00000   3rd Qu.:0.0000  
+ Max.   :1.0000   Max.   :1.0000   Max.   :1.0000   Max.   :1.00000   Max.   :1.0000   Max.   :1.00000   Max.   :1.0000  
+   RRACEBlack        RRACEAsian        RRACEOther      d_hispanic..is.na.vaxx...2. GENID_DESCRIBEmale
+ Min.   :0.00000   Min.   :0.00000   Min.   :0.00000   Min.   :0.0000              Min.   :0.0000    
+ 1st Qu.:0.00000   1st Qu.:0.00000   1st Qu.:0.00000   1st Qu.:0.0000              1st Qu.:0.0000    
+ Median :0.00000   Median :0.00000   Median :0.00000   Median :0.0000              Median :0.0000    
+ Mean   :0.08672   Mean   :0.05841   Mean   :0.05044   Mean   :0.1051              Mean   :0.3665    
+ 3rd Qu.:0.00000   3rd Qu.:0.00000   3rd Qu.:0.00000   3rd Qu.:0.0000              3rd Qu.:1.0000    
+ Max.   :1.00000   Max.   :1.00000   Max.   :1.00000   Max.   :1.0000              Max.   :1.0000    
+ GENID_DESCRIBEfemale GENID_DESCRIBEtransgender GENID_DESCRIBEother  REGIONSouth     REGIONMidwest      REGIONWest    
+ Min.   :0.0000       Min.   :0.000000          Min.   :0.00000     Min.   :0.0000   Min.   :0.0000   Min.   :0.0000  
+ 1st Qu.:0.0000       1st Qu.:0.000000          1st Qu.:0.00000     1st Qu.:0.0000   1st Qu.:0.0000   1st Qu.:0.0000  
+ Median :1.0000       Median :0.000000          Median :0.00000     Median :0.0000   Median :0.0000   Median :0.0000  
+ Mean   :0.6057       Mean   :0.002797          Mean   :0.01029     Mean   :0.3268   Mean   :0.1984   Mean   :0.3244  
+ 3rd Qu.:1.0000       3rd Qu.:0.000000          3rd Qu.:0.00000     3rd Qu.:1.0000   3rd Qu.:0.0000   3rd Qu.:1.0000  
+ Max.   :1.0000       Max.   :1.000000          Max.   :1.00000     Max.   :1.0000   Max.   :1.0000   Max.   :1.0000  
+ Works_onsiteworked.onsite Works_onsiteno   ANXIOUSno.anxiety.over.past.2.wks ANXIOUSseveral.days.anxiety.over.past.2.wks
+ Min.   :0.0000            Min.   :0.0000   Min.   :0.0000                    Min.   :0.0000                             
+ 1st Qu.:0.0000            1st Qu.:0.0000   1st Qu.:0.0000                    1st Qu.:0.0000                             
+ Median :1.0000            Median :0.0000   Median :0.0000                    Median :0.0000                             
+ Mean   :0.6051            Mean   :0.3047   Mean   :0.3271                    Mean   :0.3022                             
+ 3rd Qu.:1.0000            3rd Qu.:1.0000   3rd Qu.:1.0000                    3rd Qu.:1.0000                             
+ Max.   :1.0000            Max.   :1.0000   Max.   :1.0000                    Max.   :1.0000                             
+ ANXIOUSmore.than.half.the.days.anxiety.over.past.2.wks
+ Min.   :0.0000                                        
+ 1st Qu.:0.0000                                        
+ Median :0.0000                                        
+ Mean   :0.1014                                        
+ 3rd Qu.:0.0000                                        
+ Max.   :1.0000                                        
+> # We see the difference in names(dat_for_analysis_sub) before and after running this bit, since
+> # this removes datuse1 from many of the names, making them easier to type.
+> # For this case, we decide not to be anal retentive and leave the rest of the names unchanged.
+> # The names code just fixes the name so that it is easier to understand, by removing the dat_use1.
+> require("standardize")
+> set.seed(1)
+> NN <- length(dat_for_analysis_sub$d_vaxx...2.)
+> restrict_1 <- (runif(NN) < 0.5) 
+> summary(restrict_1)
+   Mode   FALSE    TRUE 
+logical   24501   24484 
+> dat_train <- subset(dat_for_analysis_sub, restrict_1)
+> dat_test <- subset(dat_for_analysis_sub,!restrict_1)
+> sobj <- standardize(d_vaxx...2. ~ TBIRTH_YEAR..is.na.dat_use1.vaxx.. + EEDUCsome.hs + EEDUCHS.diploma + EEDUCsome.coll 
++ + EEDUCassoc.deg + EEDUCbach.deg + EEDUCadv.deg +  MSmarried + MSwidowed + MSdivorced + MSseparated + MSnever + RRACEBlack
++ + RRACEAsian + RRACEOther + d_hispanic..is.na.vaxx...2. + GENID_DESCRIBEmale + GENID_DESCRIBEfemale + GENID_DESCRIBEtransgender 
++ + GENID_DESCRIBEother + REGIONSouth + REGIONMidwest + REGIONWest + Works_onsiteworked.onsite + Works_onsiteno 
++ + ANXIOUSno.anxiety.over.past.2.wks + ANXIOUSseveral.days.anxiety.over.past.2.wks 
++ + ANXIOUSmore.than.half.the.days.anxiety.over.past.2.wks
++                     , data = dat_train, family = binomial)
+> summary(sobj$data)
+  d_vaxx...2.     TBIRTH_YEAR..is.na.dat_use1.vaxx...V1 EEDUCsome.hs EEDUCHS.diploma EEDUCsome.coll EEDUCassoc.deg
+ Min.   :0.0000   Min.   :-1.5875338                    1:  356      1: 2725         1: 4865        1: 2803       
+ 1st Qu.:1.0000   1st Qu.:-0.8712361                    0:24128      0:21759         0:19619        0:21681       
+ Median :1.0000   Median :-0.0654012                                                                              
+ Mean   :0.8514   Mean   : 0.0000000                                                                              
+ 3rd Qu.:1.0000   3rd Qu.: 0.8299709                                                                              
+ Max.   :1.0000   Max.   : 1.9939547                                                                              
+ EEDUCbach.deg EEDUCadv.deg MSmarried MSwidowed MSdivorced MSseparated MSnever   RRACEBlack RRACEAsian RRACEOther
+ 1: 7454       1: 6120      1:14583   1:  597   1: 3586    1:  520     1: 4903   1: 2144    1: 1430    1: 1231   
+ 0:17030       0:18364      0: 9901   0:23887   0:20898    0:23964     0:19581   0:22340    0:23054    0:23253   
+                                                                                                                 
+                                                                                                                 
+                                                                                                                 
+                                                                                                                 
+ d_hispanic..is.na.vaxx...2. GENID_DESCRIBEmale GENID_DESCRIBEfemale GENID_DESCRIBEtransgender GENID_DESCRIBEother
+ 1: 2561                     1: 9035            1:14784              1:   59                   1:  244            
+ 0:21923                     0:15449            0: 9700              0:24425                   0:24240            
+                                                                                                                  
+                                                                                                                  
+                                                                                                                  
+                                                                                                                  
+ REGIONSouth REGIONMidwest REGIONWest Works_onsiteworked.onsite Works_onsiteno ANXIOUSno.anxiety.over.past.2.wks
+ 1: 8068     1: 4852       1: 7867    1:14830                   1: 7489        1: 7961                          
+ 0:16416     0:19632       0:16617    0: 9654                   0:16995        0:16523                          
+                                                                                                                
+                                                                                                                
+                                                                                                                
+                                                                                                                
+ ANXIOUSseveral.days.anxiety.over.past.2.wks ANXIOUSmore.than.half.the.days.anxiety.over.past.2.wks
+ 1: 7492                                     1: 2458                                               
+ 0:16992                                     0:22026                                               
+                                                                                                   
+                                                                                                   
+                                                                                                   
+                                                                                                   
+> s_dat_test <- predict(sobj, dat_test)
+> summary(s_dat_test)
+ TBIRTH_YEAR..is.na.dat_use1.vaxx...V1 EEDUCsome.hs EEDUCHS.diploma EEDUCsome.coll EEDUCassoc.deg EEDUCbach.deg
+ Min.   :-1.5875338                    1:  328      1: 2685         1: 4911        1: 2762        1: 7452      
+ 1st Qu.:-0.8712361                    0:24173      0:21816         0:19590        0:21739        0:17049      
+ Median :-0.0654012                                                                                            
+ Mean   :-0.0021613                                                                                            
+ 3rd Qu.: 0.8299709                                                                                            
+ Max.   : 1.9939547                                                                                            
+ EEDUCadv.deg MSmarried MSwidowed MSdivorced MSseparated MSnever   RRACEBlack RRACEAsian RRACEOther
+ 1: 6206      1:14685   1:  577   1: 3502    1:  512     1: 4931   1: 2104    1: 1431    1: 1240   
+ 0:18295      0: 9816   0:23924   0:20999    0:23989     0:19570   0:22397    0:23070    0:23261   
+                                                                                                   
+                                                                                                   
+                                                                                                   
+                                                                                                   
+ d_hispanic..is.na.vaxx...2. GENID_DESCRIBEmale GENID_DESCRIBEfemale GENID_DESCRIBEtransgender GENID_DESCRIBEother
+ 1: 2589                     1: 8916            1:14885              1:   78                   1:  260            
+ 0:21912                     0:15585            0: 9616              0:24423                   0:24241            
+                                                                                                                  
+                                                                                                                  
+                                                                                                                  
+                                                                                                                  
+ REGIONSouth REGIONMidwest REGIONWest Works_onsiteworked.onsite Works_onsiteno ANXIOUSno.anxiety.over.past.2.wks
+ 1: 7941     1: 4867       1: 8022    1:14809                   1: 7438        1: 8063                          
+ 0:16560     0:19634       0:16479    0: 9692                   0:17063        0:16438                          
+                                                                                                                
+                                                                                                                
+                                                                                                                
+                                                                                                                
+ ANXIOUSseveral.days.anxiety.over.past.2.wks ANXIOUSmore.than.half.the.days.anxiety.over.past.2.wks
+ 1: 7310                                     1: 2507                                               
+ 0:17191                                     0:21994                                               
+                                                                                                   
+                                                                                                   
+                                                                                                   
+                                                                                                   
+> model_lpm1 <- lm(sobj$formula, data = sobj$data)
+> summary(model_lpm1)
+
+Call:
+lm(formula = sobj$formula, data = sobj$data)
+
+Residuals:
+     Min       1Q   Median       3Q      Max 
+-1.07994  0.00976  0.10088  0.18215  1.08275 
+
+Coefficients:
+                                                          Estimate Std. Error t value Pr(>|t|)    
+(Intercept)                                              1.595e+00  6.817e-02  23.402  < 2e-16 ***
+TBIRTH_YEAR..is.na.dat_use1.vaxx..                      -5.945e-02  2.360e-03 -25.190  < 2e-16 ***
+EEDUCsome.hs1                                           -5.196e-02  1.586e-02  -3.275  0.00106 ** 
+EEDUCHS.diploma1                                        -1.750e-02  1.357e-02  -1.289  0.19737    
+EEDUCsome.coll1                                          1.192e-02  1.342e-02   0.888  0.37439    
+EEDUCassoc.deg1                                          2.117e-02  1.359e-02   1.558  0.11919    
+EEDUCbach.deg1                                           6.764e-02  1.337e-02   5.060 4.22e-07 ***
+EEDUCadv.deg1                                            7.961e-02  1.341e-02   5.939 2.91e-09 ***
+MSmarried1                                               1.384e-01  1.212e-02  11.415  < 2e-16 ***
+MSwidowed1                                               1.208e-01  1.389e-02   8.695  < 2e-16 ***
+MSdivorced1                                              1.167e-01  1.238e-02   9.429  < 2e-16 ***
+MSseparated1                                             1.237e-01  1.414e-02   8.746  < 2e-16 ***
+MSnever1                                                 1.445e-01  1.232e-02  11.726  < 2e-16 ***
+RRACEBlack1                                             -1.524e-05  3.917e-03  -0.004  0.99690    
+RRACEAsian1                                              4.499e-02  4.647e-03   9.682  < 2e-16 ***
+RRACEOther1                                             -1.986e-02  4.946e-03  -4.016 5.95e-05 ***
+d_hispanic..is.na.vaxx...2.1                             1.527e-02  3.567e-03   4.281 1.87e-05 ***
+GENID_DESCRIBEmale1                                      1.412e-01  1.104e-02  12.790  < 2e-16 ***
+GENID_DESCRIBEfemale1                                    1.366e-01  1.099e-02  12.437  < 2e-16 ***
+GENID_DESCRIBEtransgender1                               1.763e-01  2.440e-02   7.228 5.03e-13 ***
+GENID_DESCRIBEother1                                     1.341e-01  1.521e-02   8.816  < 2e-16 ***
+REGIONSouth1                                            -2.689e-02  3.335e-03  -8.062 7.82e-16 ***
+REGIONMidwest1                                          -2.317e-02  3.657e-03  -6.337 2.39e-10 ***
+REGIONWest1                                             -1.585e-02  3.355e-03  -4.723 2.33e-06 ***
+Works_onsiteworked.onsite1                               5.899e-02  4.451e-03  13.254  < 2e-16 ***
+Works_onsiteno1                                          5.434e-02  4.607e-03  11.795  < 2e-16 ***
+ANXIOUSno.anxiety.over.past.2.wks1                      -1.817e-02  3.151e-03  -5.764 8.29e-09 ***
+ANXIOUSseveral.days.anxiety.over.past.2.wks1             1.346e-02  3.129e-03   4.302 1.70e-05 ***
+ANXIOUSmore.than.half.the.days.anxiety.over.past.2.wks1  1.758e-02  4.151e-03   4.235 2.29e-05 ***
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Residual standard error: 0.3337 on 24455 degrees of freedom
+Multiple R-squared:  0.1208,	Adjusted R-squared:  0.1198 
+F-statistic:   120 on 28 and 24455 DF,  p-value: < 2.2e-16
+
+> pred_vals_lpm <- predict(model_lpm1, s_dat_test)
+There were 27 warnings (use warnings() to see them)
+> pred_model_lpm1 <- (pred_vals_lpm > mean(pred_vals_lpm))
+> pred_lm <- table(pred = pred_model_lpm1, true = dat_test$d_vaxx...2.)
+> pred_lm
+       true
+pred        0     1
+  FALSE  2783  8388
+  TRUE    896 12434
+> (pred_lm[1,1]+pred_lm[2,2])/sum(pred_lm)
+[1] 0.6210767
+> # logit 
+> # Because we use sobj$formaula, we just have to change the name, so we wont have to retype
+> model_logit1 <- glm(sobj$formula, family = binomial, data = sobj$data)
+> summary(model_logit1)
+
+Call:
+glm(formula = sobj$formula, family = binomial, data = sobj$data)
+
+Deviance Residuals: 
+    Min       1Q   Median       3Q      Max  
+-3.0612   0.2666   0.4104   0.5823   2.8304  
+
+Coefficients:
+                                                         Estimate Std. Error z value Pr(>|z|)    
+(Intercept)                                              6.921457   0.534875  12.940  < 2e-16 ***
+TBIRTH_YEAR..is.na.dat_use1.vaxx..                      -0.528221   0.022002 -24.008  < 2e-16 ***
+EEDUCsome.hs1                                           -0.266459   0.113314  -2.352  0.01870 *  
+EEDUCHS.diploma1                                        -0.080822   0.099344  -0.814  0.41590    
+EEDUCsome.coll1                                          0.093770   0.098620   0.951  0.34170    
+EEDUCassoc.deg1                                          0.157469   0.100180   1.572  0.11598    
+EEDUCbach.deg1                                           0.570227   0.099225   5.747 9.10e-09 ***
+EEDUCadv.deg1                                            0.761477   0.100819   7.553 4.26e-14 ***
+MSmarried1                                               0.782771   0.086269   9.074  < 2e-16 ***
+MSwidowed1                                               0.610304   0.104342   5.849 4.94e-09 ***
+MSdivorced1                                              0.597136   0.088698   6.732 1.67e-11 ***
+MSseparated1                                             0.671109   0.104468   6.424 1.33e-10 ***
+MSnever1                                                 0.845147   0.088644   9.534  < 2e-16 ***
+RRACEBlack1                                              0.007664   0.033030   0.232  0.81652    
+RRACEAsian1                                              0.678868   0.071626   9.478  < 2e-16 ***
+RRACEOther1                                             -0.143722   0.039348  -3.653  0.00026 ***
+d_hispanic..is.na.vaxx...2.1                             0.126959   0.031367   4.048 5.18e-05 ***
+GENID_DESCRIBEmale1                                      0.829635   0.076149  10.895  < 2e-16 ***
+GENID_DESCRIBEfemale1                                    0.780566   0.075356  10.358  < 2e-16 ***
+GENID_DESCRIBEtransgender1                               1.112376   0.222525   4.999 5.77e-07 ***
+GENID_DESCRIBEother1                                     0.788701   0.117614   6.706 2.00e-11 ***
+REGIONSouth1                                            -0.268582   0.033289  -8.068 7.13e-16 ***
+REGIONMidwest1                                          -0.242178   0.035690  -6.786 1.16e-11 ***
+REGIONWest1                                             -0.174379   0.034057  -5.120 3.05e-07 ***
+Works_onsiteworked.onsite1                               0.399503   0.034630  11.536  < 2e-16 ***
+Works_onsiteno1                                          0.360048   0.036252   9.932  < 2e-16 ***
+ANXIOUSno.anxiety.over.past.2.wks1                      -0.165777   0.027251  -6.083 1.18e-09 ***
+ANXIOUSseveral.days.anxiety.over.past.2.wks1             0.140993   0.028921   4.875 1.09e-06 ***
+ANXIOUSmore.than.half.the.days.anxiety.over.past.2.wks1  0.160487   0.039024   4.113 3.91e-05 ***
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+(Dispersion parameter for binomial family taken to be 1)
+
+    Null deviance: 20582  on 24483  degrees of freedom
+Residual deviance: 17758  on 24455  degrees of freedom
+AIC: 17816
+
+Number of Fisher Scoring iterations: 6
+
+> pred_vals <- predict(model_logit1, s_dat_test)
+There were 27 warnings (use warnings() to see them)
+> pred_model_logit1 <- (pred_vals > 0.5)
+> pred_logit <- table(pred = pred_model_logit1, true = dat_test$d_vaxx...2.)
+> pred_logit
+       true
+pred        0     1
+  FALSE   719   707
+  TRUE   2960 20115
+> (pred_logit[1,1]+pred_logit[2,2])/sum(pred_logit)
+[1] 0.8503326
+
+
